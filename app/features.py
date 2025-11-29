@@ -1,6 +1,7 @@
 from typing import Dict, Any, List
 import math
 
+
 def jaccard(list_a: List[str], list_b: List[str]) -> float:
     set_a = set([x.strip().lower() for x in list_a if x])
     set_b = set([x.strip().lower() for x in list_b if x])
@@ -10,14 +11,18 @@ def jaccard(list_a: List[str], list_b: List[str]) -> float:
     union = len(set_a | set_b)
     return inter / union if union > 0 else 0.0
 
+
 def split_comma(text: str) -> List[str]:
+    if not isinstance(text, str):
+        return []
     return [t.strip() for t in text.split(",") if t.strip()]
 
+
 def build_structured_features(requisitos: Dict[str, Any], candidato_row) -> Dict[str, float]:
-    feats = {}
+    feats: Dict[str, float] = {}
 
     # Cargo
-    cargo_req = requisitos.get("cargo", "").lower()
+    cargo_req = (requisitos.get("cargo", "") or "").lower()
     cargo_cand = (candidato_row["cargo"] or "").lower()
     feats["cargo_match"] = 1.0 if cargo_req and cargo_req in cargo_cand else 0.0
 

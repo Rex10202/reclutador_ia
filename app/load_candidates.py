@@ -1,15 +1,19 @@
 import os
 import sqlite3
+from typing import Any
 import pandas as pd
 
 from .config import BASE_DIR, DB_PATH, RAW_CSV_PATH
-from .db import insert_candidate
+from .db import insert_candidate, get_connection
 
 SCHEMA_PATH = os.path.join(BASE_DIR, "app", "schema.sql")
 
 
-def crear_base_y_tabla():
-    # Elimina la BD anterior si existe (para pruebas)
+def crear_base_y_tabla() -> None:
+    """
+    Elimina la base de datos anterior (si existe) y crea una nueva tabla
+    'candidatos' aplicando el esquema definido en schema.sql.
+    """
     if os.path.exists(DB_PATH):
         os.remove(DB_PATH)
 
@@ -22,15 +26,21 @@ def crear_base_y_tabla():
     print(f"[OK] Base y tabla creadas en {DB_PATH}")
 
 
-def limpiar_ubicacion(loc):
+def limpiar_ubicacion(loc: Any) -> str:
+    """
+    Limpia pequeñas inconsistencias en el campo de ubicación, por ejemplo
+    comillas extra en valores como '"Cali"'.
+    """
     if not isinstance(loc, str):
         return ""
-    # Quita espacios extras y comillas tipo "Cali"
     loc = loc.strip().strip('"').strip()
     return loc
 
 
-def normalizar_idioma(lang):
+def normalizar_idioma(lang: Any) -> str:
+    """
+    Normaliza valores de idioma a formas más legibles.
+    """
     if not isinstance(lang, str):
         return ""
     l = lang.strip().lower()
@@ -45,10 +55,9 @@ def normalizar_idioma(lang):
     return lang.strip()
 
 
-def skills_semicolon_to_comma(skills):
+def skills_semicolon_to_comma(skills: Any) -> str:
     """
-    Convierte: "mantenimiento preventivo;SAP PM"
-    a:        "mantenimiento preventivo, SAP PM"
+    Convierte 'a;b;c' -> 'a, b, c' para almacenarlo de forma homogénea.
     """
     if not isinstance(skills, str):
         return ""
@@ -56,10 +65,11 @@ def skills_semicolon_to_comma(skills):
     return ", ".join(parts)
 
 
-def cargar_candidatos_desde_csv():
-    from .db import get_connection
-
-    # RAW_CSV_PATH ahora es sample_queries.csv
+def cargar_candidatos_desde_csv() -> None:
+    """
+    Lee sample_queries.csv (alias RAW_CSV_PATH) y genera un candidato sintético
+    por cada fila.
+    """
     df = pd.read_csv(RAW_CSV_PATH)
 
     # Rellenar NaN y limpiar columnas clave
@@ -75,7 +85,14 @@ def cargar_candidatos_desde_csv():
     conn = get_connection()
 
     for idx, row in df.iterrows():
-        nombre = f"Candidato {int(row['id'])}" if "id" in df.columns else f"Candidato {idx+1}"
+        # Nombre sintético: usa id si existe, si no, índice+1
+        if "id" in df.columns:
+            try:
+                nombre = f"Candidato {int(row['id'])}"
+            except Exception:
+                nombre = f"Candidato {idx+1}"
+        else:
+            nombre = f"Candidato {idx+1}"
 
         cargo = row.get("role", "")
         habilidades = skills_semicolon_to_comma(row.get("skills", ""))
@@ -86,7 +103,6 @@ def cargar_candidatos_desde_csv():
 
         modalidad = "No especificada"
         disponibilidad = "Inmediata"
-
         descripcion = row.get("query_text", "")
 
         candidato = {
@@ -94,8 +110,8 @@ def cargar_candidatos_desde_csv():
             "cargo": cargo,
             "habilidades": habilidades,
             "experiencia_anios": experiencia_anios,
-            "idiomas": idioma_norm,      
-            "nivel_idioma": "",          
+            "idiomas": idioma_norm,
+            "nivel_idioma": "",
             "ubicacion": ubicacion,
             "modalidad": modalidad,
             "disponibilidad": disponibilidad,

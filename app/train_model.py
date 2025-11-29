@@ -1,17 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
-"""
-Fase 3: Entrenamiento del modelo de recomendación usando sample_queries.csv.
-
-- Lee sample_queries.csv (consultas reales de Talento Humano).
-- Toma los campos estructurados (role, skills, languages, experience_years, location).
-- Genera pares (consulta, candidato) con etiquetas por reglas.
-- Construye features estructuradas.
-- Entrena una Regresión Logística.
-- Guarda el modelo en models/modelo_recomendador.joblib.
-"""
-
 from typing import List, Dict, Any
 import numpy as np
 import pandas as pd
@@ -25,7 +11,7 @@ from .features import build_structured_features, features_to_vector
 from .config import MODEL_PATH, SAMPLE_QUERIES_PATH
 
 
-def normalizar_texto_simple(s: str) -> str:
+def normalizar_texto_simple(s: Any) -> str:
     if not isinstance(s, str):
         return ""
     s = s.strip()
@@ -34,15 +20,10 @@ def normalizar_texto_simple(s: str) -> str:
 
 
 def cargar_consultas_desde_csv() -> pd.DataFrame:
-    """
-    Carga sample_queries.csv y hace limpieza básica.
-    Espera columnas:
-    id, query_text, role, skills, languages, experience_years, location, num_candidates
-    """
     df = pd.read_csv(SAMPLE_QUERIES_PATH)
 
-    # Limpiar strings básicos
-    for col in ["query_text", "role", "skills", "languages", "location"]:
+    # Limpiar strings básicos de las columnas estructuradas
+    for col in ["role", "skills", "languages", "location"]:
         if col in df.columns:
             df[col] = df[col].fillna("").astype(str).apply(normalizar_texto_simple)
 
@@ -52,7 +33,7 @@ def cargar_consultas_desde_csv() -> pd.DataFrame:
     else:
         df["experience_years"] = 0.0
 
-    # Número de candidatos
+    # Número de candidatos solicitados
     if "num_candidates" in df.columns:
         df["num_candidates"] = df["num_candidates"].fillna(10).astype(int)
     else:
@@ -62,18 +43,13 @@ def cargar_consultas_desde_csv() -> pd.DataFrame:
 
 
 def parse_skills(skills_str: str) -> List[str]:
-    """
-    Convierte "mantenimiento preventivo;SAP PM" -> ["mantenimiento preventivo", "SAP PM"]
-    """
     if not isinstance(skills_str, str):
         return []
     return [s.strip() for s in skills_str.split(";") if s.strip()]
 
 
 def parse_idiomas(lang_str: str) -> List[str]:
-    """
-    Convierte 'ingles' -> ['Inglés'], etc.
-    """
+
     if not isinstance(lang_str, str) or not lang_str.strip():
         return []
 
@@ -92,10 +68,6 @@ def parse_idiomas(lang_str: str) -> List[str]:
 
 
 def requisitos_desde_fila_csv(row) -> Dict[str, Any]:
-    """
-    Construye un diccionario de requisitos según el modelo de perfil de candidato,
-    usando los campos estructurados del CSV (ground truth).
-    """
     cargo = row.get("role", "")
     skills_list = parse_skills(row.get("skills", ""))
     idiomas_list = parse_idiomas(row.get("languages", ""))
@@ -104,28 +76,18 @@ def requisitos_desde_fila_csv(row) -> Dict[str, Any]:
     num_cand = int(row.get("num_candidates", 10) or 10)
 
     req = {
-        "texto_original": row.get("query_text", ""),
         "cargo": cargo,
         "habilidades": skills_list,
         "idiomas": idiomas_list,
         "experiencia_minima": int(exp_years),
         "ubicacion": ubicacion,
-        "modalidad": "",  # el CSV no trae modalidad, por ahora se deja vacío
+        "modalidad": "",  # el CSV no incluye modalidad explícita
         "cantidad_candidatos": num_cand,
     }
     return req
 
 
 def etiqueta_por_reglas(requisitos: Dict[str, Any], candidato_row) -> int:
-    """
-    Regla simple para generar etiquetas (y=1 candidato apto, y=0 no apto):
-
-    - 1 si:
-      * Si hay cargo requerido y aparece en el cargo del candidato.
-      * Y comparte al menos una habilidad requerida (si hay).
-      * Y experiencia del candidato >= experiencia mínima (si se especificó).
-    - 0 en caso contrario.
-    """
     cargo_req = (requisitos.get("cargo", "") or "").lower()
     cargo_cand = (candidato_row["cargo"] or "").lower()
 
@@ -142,21 +104,20 @@ def etiqueta_por_reglas(requisitos: Dict[str, Any], candidato_row) -> int:
     if exp_req > 0 and exp_cand < exp_req:
         return 0
 
-    # Podrías añadir reglas para idiomas, ubicación, etc. más adelante.
     return 1
 
 
-def main():
+def main() -> None:
     # 1) Cargar candidatos desde la BD
     conn = get_connection()
     candidatos = get_all_candidates(conn)
     print(f"[INFO] Candidatos cargados desde la BD: {len(candidatos)}")
 
-    # 2) Cargar consultas desde sample_queries.csv
+    # 2) Cargar consultas estructuradas desde sample_queries.csv
     df_q = cargar_consultas_desde_csv()
     print(f"[INFO] Consultas en sample_queries.csv: {len(df_q)}")
 
-    # Orden de las características (coherente con features.py)
+    # Orden de las características
     feature_order = [
         "cargo_match",
         "habilidades_jaccard",
@@ -173,7 +134,7 @@ def main():
     X = []
     y = []
 
-    # 3) Generar dataset de entrenamiento: pares (consulta, candidato)
+    # 3) Generar dataset de entrenamiento: pares (consulta estructurada, candidato)
     for _, row in df_q.iterrows():
         req = requisitos_desde_fila_csv(row)
         for cand in candidatos:
@@ -183,16 +144,16 @@ def main():
             X.append(vec)
             y.append(label)
 
-    X = np.array(X, dtype=float)
-    y = np.array(y, dtype=int)
+    X_arr = np.array(X, dtype=float)
+    y_arr = np.array(y, dtype=int)
 
-    if len(set(y)) < 2:
+    if len(set(y_arr)) < 2:
         print("[ADVERTENCIA] Las reglas generaron solo una clase (todo 0 o todo 1).")
         print("Ajusta las reglas o agrega más consultas/candidatos.")
         return
 
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.3, random_state=42, stratify=y
+        X_arr, y_arr, test_size=0.3, random_state=42, stratify=y_arr
     )
 
     model = LogisticRegression(max_iter=1000)
