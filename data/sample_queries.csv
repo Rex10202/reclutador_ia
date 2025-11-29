@@ -1,0 +1,13 @@
+id,query_text,role,skills,languages,experience_years,location,num_candidates
+1,"Necesito 3 ingenieros de mantenimiento con experiencia en mantenimiento preventivo y manejo de SAP PM en Cartagena.","ingeniero de mantenimiento","mantenimiento preventivo;SAP PM","",3,"Cartagena",3
+2,"Busco un ingeniero de mantenimiento industrial con al menos 5 años de experiencia en mantenimiento correctivo y preventivo, ubicado en Barranquilla.","ingeniero de mantenimiento","mantenimiento correctivo;mantenimiento preventivo","",5,"Barranquilla",1
+3,"Requiero ingenieros de mantenimiento que conozcan mantenimiento predictivo y gestión de repuestos para planta en Cartagena, mínimo 2 años de experiencia.","ingeniero de mantenimiento","mantenimiento predictivo;gestion de repuestos","",2,"Cartagena",5
+4,"Talento Humano solicita 2 ingenieros de sistemas con dominio de Python y SQL, que hablen inglés, en la ciudad de cali.","ingeniero de sistemas","python;sql","ingles","", "Cali",2
+5,"Busco un analista de datos con experiencia en Power BI, SQL y visualización de datos, con 3 años de experiencia, en Bogotá.","analista de datos","power bi;sql;visualizacion de datos","",3,"Bogotá",1
+6,"Se requieren 5 técnicos de mantenimiento con conocimientos básicos en electricidad y mecánica, sin necesidad de inglés, para Cartagena.","tecnico de mantenimiento","electricidad;mecanica","",0,"Cartagena",5
+7,"Necesito un desarrollador backend con experiencia en Java y Spring Boot, al menos 4 años, que resida en Medellín y tenga inglés.","desarrollador backend","java;spring boot","ingles",4,"Medellín",1
+8,"Busco ingeniero de mantenimiento con conocimientos en TPM y seguridad industrial para planta en Cartagena, no se especifica experiencia mínima.","ingeniero de mantenimiento","tpm;seguridad industrial","",,"Cartagena",5
+9,"Solicito 2 analistas de soporte técnico con buen manejo de redes y sistemas operativos, con inglés, en Barranquilla.","analista de soporte tecnico","redes;sistemas operativos","ingles","", "Barranquilla",2
+10,"Requerimos ingeniero de mantenimiento con inglés y experiencia en mantenimiento de maquinaria pesada, preferiblemente en Bogotá o alrededores.","ingeniero de mantenimiento","mantenimiento de maquinaria pesada","ingles","", "Bogotá",1
+11,"Necesito candidatos para el rol de desarrollador frontend con experiencia en React y TypeScript, sin restricción de ciudad, mínimo 2 años de experiencia.","desarrollador frontend","react;typescript","",2,"",5
+12,"Buscamos 4 ingenieros de mantenimiento junior, sin experiencia previa, que residan en Cartagena y tengan conocimientos básicos de mantenimiento industrial.","ingeniero de mantenimiento","mantenimiento industrial","",0,"Cartagena",4
