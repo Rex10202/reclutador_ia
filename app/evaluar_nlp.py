@@ -1,16 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
-"""
-Evaluación del módulo NLP usando sample_queries.csv
-
-Compara:
-- cargo detectado vs role
-- ubicación detectada vs location
-- años de experiencia vs experience_years
-- habilidades detectadas vs skills (Jaccard)
-"""
-
 import pandas as pd
 from .config import SAMPLE_QUERIES_PATH
 from .nlp_module import interpretar_consulta

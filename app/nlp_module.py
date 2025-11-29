@@ -1,17 +1,6 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
-"""
-Fase 2: Interpretación de consultas en lenguaje natural.
-
-Convierte texto libre en una estructura de requisitos alineada con el modelo
-de candidato (cargo, habilidades, experiencia, idiomas, ubicacion, etc.).
-"""
-
 import re
 from typing import List, Dict, Any
 
-# Diccionarios básicos (puedes extenderlos)
 CARGOS_CONOCIDOS = [
     "desarrollador backend",
     "desarrollador frontend",

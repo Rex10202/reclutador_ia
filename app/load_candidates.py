@@ -1,19 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
-"""
-Fase 1: Construcción de la base de candidatos a partir de sample_queries.csv.
-
-- Crea la base de datos SQLite.
-- Ejecuta el esquema SQL (schema.sql).
-- Lee sample_queries.csv.
-- Transforma cada fila en un "perfil de candidato" sintético.
-- Inserta los candidatos en la tabla 'candidatos'.
-
-sample_queries.csv tiene columnas:
-id, query_text, role, skills, languages, experience_years, location, num_candidates
-"""
-
 import os
 import sqlite3
 import pandas as pd
@@ -91,8 +75,6 @@ def cargar_candidatos_desde_csv():
     conn = get_connection()
 
     for idx, row in df.iterrows():
-        # Generamos un nombre sintético de candidato
-        # por ejemplo: "Candidato 1", "Candidato 2", ...
         nombre = f"Candidato {int(row['id'])}" if "id" in df.columns else f"Candidato {idx+1}"
 
         cargo = row.get("role", "")
@@ -102,7 +84,6 @@ def cargar_candidatos_desde_csv():
         idioma_norm = normalizar_idioma(row.get("languages", ""))
         ubicacion = limpiar_ubicacion(row.get("location", ""))
 
-        # Modalidad y disponibilidad no vienen en el CSV, ponemos valores por defecto
         modalidad = "No especificada"
         disponibilidad = "Inmediata"
 
@@ -113,8 +94,8 @@ def cargar_candidatos_desde_csv():
             "cargo": cargo,
             "habilidades": habilidades,
             "experiencia_anios": experiencia_anios,
-            "idiomas": idioma_norm,      # guardamos como string (ej: "Inglés")
-            "nivel_idioma": "",          # vacio por ahora
+            "idiomas": idioma_norm,      
+            "nivel_idioma": "",          
             "ubicacion": ubicacion,
             "modalidad": modalidad,
             "disponibilidad": disponibilidad,

@@ -1,10 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
-"""
-Construcción de características (features) para el modelo de recomendación.
-"""
-
 from typing import Dict, Any, List
 import math
 
@@ -21,9 +14,6 @@ def split_comma(text: str) -> List[str]:
     return [t.strip() for t in text.split(",") if t.strip()]
 
 def build_structured_features(requisitos: Dict[str, Any], candidato_row) -> Dict[str, float]:
-    """
-    Genera características numéricas y booleanas entre la consulta y un candidato.
-    """
     feats = {}
 
     # Cargo

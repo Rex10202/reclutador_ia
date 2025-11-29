@@ -1,16 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
-"""
-Fase 4: Integración en aplicación web (FastAPI).
-
-- Endpoint POST /recomendar
-- Recibe una consulta en lenguaje natural.
-- Interpreta la consulta (Fase 2).
-- Construye features con los candidatos (Fase 3).
-- Usa modelo entrenado para puntuar afinidad y devuelve top-k.
-"""
-
 from typing import List, Dict, Any
 import joblib
 import numpy as np
