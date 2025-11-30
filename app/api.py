@@ -1,10 +1,13 @@
+import os
 from typing import List, Dict, Any, Optional
 import numpy as np
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sentence_transformers import SentenceTransformer
-
 from .db import get_connection, get_all_candidates
+from .config import BASE_DIR
 
 # ------------------------------
 # Carga del modelo de embeddings
@@ -13,19 +16,28 @@ from .db import get_connection, get_all_candidates
 MODEL_NAME = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
 EMBEDDING_MODEL = SentenceTransformer(MODEL_NAME)
 
+# -----------------------------------
+# Rutas del frontend (HTML, CSS, JS)
+# -----------------------------------
+FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
 
 # -----------------------------------
 # Definición de la aplicación FastAPI
 # -----------------------------------
 
 app = FastAPI(
-    title="Talento humano IA",
+    title="Recomendador de Candidatos basado en Embeddings",
     description=(
         "Herramienta web basada en un modelo preentrenado multilingüe "
-        "que calcula la afinidad entre una vacante"
         " y los perfiles de candidatos almacenados en la base de datos."
     ),
-    version="0.3.0",
+    version="0.3.1",
+)
+
+app.mount(
+    "/static",
+    StaticFiles(directory=FRONTEND_DIR),
+    name="static"
 )
 
 # -----------------------------------
@@ -33,8 +45,8 @@ app = FastAPI(
 # -----------------------------------
 
 class ConsultaEstructuradaReq(BaseModel):
-    role: str                 
-    skills: str               
+    role: str
+    skills: str
     languages: Optional[str] = None
     experience_years: Optional[float] = 0
     location: Optional[str] = None
@@ -196,7 +208,7 @@ def recomendar(entrada: ConsultaEstructuradaReq):
         normalize_embeddings=True
     )[0]
 
-    scores = np.dot(CANDIDATE_EMBEDDINGS, query_emb)  # shape (num_candidatos,)
+    scores = np.dot(CANDIDATE_EMBEDDINGS, query_emb)
 
     candidatos_con_score = list(zip(CANDIDATE_ROWS, scores))
     candidatos_con_score.sort(key=lambda x: x[1], reverse=True)
@@ -222,3 +234,12 @@ def recomendar(entrada: ConsultaEstructuradaReq):
         consulta=requisitos,
         candidatos=candidatos_resp,
     )
+    
+# -----------------------------------
+# Endpoint para servir la página web
+# -----------------------------------
+
+@app.get("/")
+def get_index():
+    index_path = os.path.join(FRONTEND_DIR, "index.html")
+    return FileResponse(index_path)

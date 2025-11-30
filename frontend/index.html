@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Recomendador de Candidatos - Chatbot</title>
+  <link rel="stylesheet" href="/static/css/styles.css" />
+</head>
+<body>
+  <div class="app-container">
+    <header class="app-header">
+      <h1>Recomendador de Candidatos</h1>
+      <p>Agente IA para Talento Humano</p>
+    </header>
+
+    <main class="chat-container">
+      <div id="chat-window" class="chat-window">
+        <!-- Mensajes del chat se agregan aquí dinámicamente -->
+        <div class="message bot">
+          <div class="avatar">🤖</div>
+          <div class="bubble">
+            ¡Hola! 👋<br />
+            Dime qué perfil necesitas y buscaré los candidatos más afines.<br />
+            Completa los campos de abajo y pulsa <strong>Enviar consulta</strong>.
+          </div>
+        </div>
+      </div>
+
+      <form id="query-form" class="query-form">
+        <div class="field-group">
+          <label for="role">Cargo buscado</label>
+          <input type="text" id="role" name="role" placeholder="Ej: Ingeniero de mantenimiento" required />
+        </div>
+
+        <div class="field-group">
+          <label for="skills">Habilidades requeridas (separadas por ';')</label>
+          <input type="text" id="skills" name="skills" placeholder="Ej: mantenimiento preventivo;SAP PM" required />
+        </div>
+
+        <div class="field-group">
+          <label for="languages">Idiomas (opcional)</label>
+          <input type="text" id="languages" name="languages" placeholder="Ej: ingles" />
+        </div>
+
+        <div class="field-group-inline">
+          <div>
+            <label for="experience_years">Años de experiencia</label>
+            <input type="number" id="experience_years" name="experience_years" min="0" step="1" value="0" />
+          </div>
+          <div>
+            <label for="location">Ubicación (opcional)</label>
+            <input type="text" id="location" name="location" placeholder="Ej: Cartagena" />
+          </div>
+          <div>
+            <label for="num_candidates"># candidatos</label>
+            <input type="number" id="num_candidates" name="num_candidates" min="1" step="1" value="3" />
+          </div>
+        </div>
+
+        <button type="submit" class="btn-submit">Enviar consulta</button>
+      </form>
+    </main>
+  </div>
+
+  <script src="/static/js/chat.js"></script>
+</body>
+</html>
