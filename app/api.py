@@ -1,32 +1,40 @@
 from typing import List, Dict, Any, Optional
-
-import joblib
 import numpy as np
 from fastapi import FastAPI
 from pydantic import BaseModel
+from sentence_transformers import SentenceTransformer
 
-from .config import MODEL_PATH
 from .db import get_connection, get_all_candidates
-from .features import build_structured_features, features_to_vector
+
+# ------------------------------
+# Carga del modelo de embeddings
+# ------------------------------
+
+MODEL_NAME = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+EMBEDDING_MODEL = SentenceTransformer(MODEL_NAME)
 
 
-_model_bundle = joblib.load(MODEL_PATH)
-MODEL = _model_bundle["model"]
-FEATURE_ORDER = _model_bundle["feature_order"]
+# -----------------------------------
+# Definición de la aplicación FastAPI
+# -----------------------------------
 
 app = FastAPI(
-    title="Recomendador de Candidatos para Talento Humano",
-    description="Herramienta web basada en IA que recomienda candidatos a partir de consultas estructuradas.",
-    version="0.2.1",
+    title="Talento humano IA",
+    description=(
+        "Herramienta web basada en un modelo preentrenado multilingüe "
+        "que calcula la afinidad entre una vacante"
+        " y los perfiles de candidatos almacenados en la base de datos."
+    ),
+    version="0.3.0",
 )
 
+# -----------------------------------
+# Esquemas de entrada/salida (Pydantic)
+# -----------------------------------
 
 class ConsultaEstructuradaReq(BaseModel):
-    """
-    Representa la "consulta" que recibe el modelo: los requisitos de la vacante.
-    """
-    role: str
-    skills: str
+    role: str                 
+    skills: str               
     languages: Optional[str] = None
     experience_years: Optional[float] = 0
     location: Optional[str] = None
@@ -49,6 +57,9 @@ class RespuestaRecomendacion(BaseModel):
     consulta: Dict[str, Any]
     candidatos: List[CandidatoResp]
 
+# -----------------------------------
+# Funciones auxiliares para texto
+# -----------------------------------
 def parse_skills(skills_str: str) -> List[str]:
     if not isinstance(skills_str, str):
         return []
@@ -82,41 +93,112 @@ def requisitos_desde_consulta(req: ConsultaEstructuradaReq) -> Dict[str, Any]:
         "idiomas": idiomas_list,
         "experiencia_minima": int(exp_years),
         "ubicacion": ubicacion,
-        "modalidad": "",  # podría añadirse si el formulario lo incluye
         "cantidad_candidatos": num_cand,
     }
     return requisitos
 
+def construir_texto_vacante(requisitos: Dict[str, Any]) -> str:
+    partes = []
+
+    cargo = requisitos.get("cargo", "").strip()
+    if cargo:
+        partes.append(f"Vacante para el cargo de {cargo}.")
+
+    habilidades = requisitos.get("habilidades", [])
+    if habilidades:
+        partes.append("Se requieren habilidades en: " + ", ".join(habilidades) + ".")
+
+    exp = requisitos.get("experiencia_minima", 0)
+    if exp and exp > 0:
+        partes.append(f"Se requiere al menos {exp} años de experiencia.")
+
+    idiomas = requisitos.get("idiomas", [])
+    if idiomas:
+        partes.append("Idiomas requeridos: " + ", ".join(idiomas) + ".")
+
+    ubicacion = requisitos.get("ubicacion", "").strip()
+    if ubicacion:
+        partes.append(f"Ubicación de la vacante: {ubicacion}.")
+
+    if not partes:
+        partes.append("Vacante sin requisitos específicos definidos.")
+
+    return " ".join(partes)
+
+
+def construir_texto_candidato(row) -> str:
+    partes = []
+
+    cargo = (row["cargo"] or "").strip()
+    if cargo:
+        partes.append(f"Cargo: {cargo}.")
+
+    habilidades = (row["habilidades"] or "").strip()
+    if habilidades:
+        partes.append(f"Habilidades: {habilidades}.")
+
+    exp = row["experiencia_anios"] or 0
+    partes.append(f"Experiencia: {exp} años.")
+
+    idiomas = (row["idiomas"] or "").strip()
+    if idiomas:
+        partes.append(f"Idiomas: {idiomas}.")
+
+    ubicacion = (row["ubicacion"] or "").strip()
+    if ubicacion:
+        partes.append(f"Ubicación: {ubicacion}.")
+
+    modalidad = (row["modalidad"] or "").strip()
+    if modalidad:
+        partes.append(f"Modalidad: {modalidad}.")
+
+    disponibilidad = (row["disponibilidad"] or "").strip()
+    if disponibilidad:
+        partes.append(f"Disponibilidad: {disponibilidad}.")
+
+    if not partes:
+        partes.append("Perfil de candidato sin información detallada.")
+
+    return " ".join(partes)
+
+
+# -----------------------------------
+# Carga inicial de candidatos + embeddings
+# -----------------------------------
+
+_conn_init = get_connection()
+CANDIDATE_ROWS = get_all_candidates(_conn_init)
+_conn_init.close()
+
+CANDIDATE_TEXTS = [construir_texto_candidato(row) for row in CANDIDATE_ROWS]
+
+CANDIDATE_EMBEDDINGS = EMBEDDING_MODEL.encode(
+    CANDIDATE_TEXTS,
+    convert_to_numpy=True,
+    normalize_embeddings=True
+)
+
+
+# -----------------------------------
+# Endpoint principal de recomendación
+# -----------------------------------
 
 @app.post("/recomendar", response_model=RespuestaRecomendacion)
 def recomendar(entrada: ConsultaEstructuradaReq):
-    req = requisitos_desde_consulta(entrada)
-    top_k = req.get("cantidad_candidatos", 10) or 10
+    requisitos = requisitos_desde_consulta(entrada)
+    top_k = requisitos.get("cantidad_candidatos", 10) or 10
 
-    conn = get_connection()
-    candidatos_rows = get_all_candidates(conn)
+    texto_vacante = construir_texto_vacante(requisitos)
 
-    vectores = []
-    rows_lista = []
+    query_emb = EMBEDDING_MODEL.encode(
+        [texto_vacante],
+        convert_to_numpy=True,
+        normalize_embeddings=True
+    )[0]
 
-    for row in candidatos_rows:
-        feats = build_structured_features(req, row)
-        vec = features_to_vector(feats, FEATURE_ORDER)
-        vectores.append(vec)
-        rows_lista.append(row)
+    scores = np.dot(CANDIDATE_EMBEDDINGS, query_emb)  # shape (num_candidatos,)
 
-    if not vectores:
-        return RespuestaRecomendacion(consulta=req, candidatos=[])
-
-    X = np.array(vectores, dtype=float)
-    # Probabilidad de clase 1 (candidato idóneo)
-    scores = MODEL.predict_proba(X)[:, 1]
-
-    candidatos_con_score = []
-    for row, score in zip(rows_lista, scores):
-        candidatos_con_score.append((row, float(score)))
-
-    # Ordenar de mayor a menor score
+    candidatos_con_score = list(zip(CANDIDATE_ROWS, scores))
     candidatos_con_score.sort(key=lambda x: x[1], reverse=True)
 
     candidatos_resp: List[CandidatoResp] = []
@@ -132,11 +214,11 @@ def recomendar(entrada: ConsultaEstructuradaReq):
                 ubicacion=row["ubicacion"] or "",
                 modalidad=row["modalidad"] or "",
                 disponibilidad=row["disponibilidad"] or "",
-                score=round(score, 4),
+                score=round(float(score), 4),
             )
         )
 
     return RespuestaRecomendacion(
-        consulta=req,
+        consulta=requisitos,
         candidatos=candidatos_resp,
     )
