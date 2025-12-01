@@ -1,0 +1,7 @@
+id,role,skills,languages,experience_years,location,num_candidates,relevant_ids
+1,Ingeniero de mantenimiento,"mantenimiento preventivo;SAP PM",ingles,3,Cartagena,5,"1;11;23;44;50"
+2,Analista de datos,"python;sql;power bi",ingles,1,Bogotá,5,"2;7;24;39;45"
+3,Técnico de mantenimiento,"mantenimiento correctivo;electricidad industrial","",5,Barranquilla,5,"3;13;21;29;42"
+4,Coordinador de talento humano,"reclutamiento;entrevistas por competencias",espanol,5,Bogotá,5,"4;10;14;22;32;43;47"
+5,Científico de datos,"python;scikit-learn;nlp",ingles,3,Bogotá,5,"20;24;34;49"
+6,Ingeniero de automatización,"PLC;SCADA;siemens",ingles,3,Cartagena,5,"19;29;40"
