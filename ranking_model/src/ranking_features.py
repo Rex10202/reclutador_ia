@@ -1,110 +1,162 @@
-from dataclasses import asdict, dataclass, field
-from typing import Dict, List, Optional
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import List, Optional, Tuple
+
+from .ranking_engine import RankingQueryRequirements, RankedCandidate
+from .ranking_orchestrator import RankingOrchestrator, _normalize_text
+
+
+__all__ = [
+    "QueryRequirements",
+    "run_ranking",
+    "build_candidate_features",
+    "score_candidate",
+]
+
+
+# --------------------------------------------------------------------------------------
+# API PRINCIPAL PARA app.py
+# --------------------------------------------------------------------------------------
 
 
 @dataclass
 class QueryRequirements:
-	"""Esquema mínimo usado por ranking_model para no depender de NLP.
+    """
+    Clase de alto nivel que usa la app (FastAPI).
+    """
+    role: Optional[str] = None
+    skills: Optional[List[str]] = None
+    location: Optional[str] = None
+    years_exp: Optional[int] = None
+    languages: Optional[List[str]] = None
+    num_candidates: Optional[int] = None
 
-	Mantiene los mismos nombres de campos para que la API pueda
-	madear fácilmente desde el objeto que venga del módulo NLP.
-	"""
+    def to_ranking_requirements(self) -> RankingQueryRequirements:
+        """
+        Convierte a la estructura interna que usa el motor semántico.
+        """
+        return RankingQueryRequirements(
+            role=self.role,
+            skills=self.skills,
+            location=self.location,
+            years_experience=self.years_exp,
+            languages=self.languages,
+        )
 
-	role: Optional[str] = None
-	skills: List[str] = field(default_factory=list)
-	location: Optional[str] = None
-	years_experience: Optional[int] = None
-	num_candidates: Optional[int] = None
-	languages: List[str] = field(default_factory=list)
+
+_orchestrator: Optional[RankingOrchestrator] = None
 
 
-def _split_semicolon_list(value: str) -> List[str]:
-	if not value:
-		return []
-	return [item.strip() for item in value.split(";") if item.strip()]
+def _get_orchestrator() -> RankingOrchestrator:
+    global _orchestrator
+    if _orchestrator is None:
+        _orchestrator = RankingOrchestrator()
+    return _orchestrator
+
+
+def run_ranking(query_req: QueryRequirements) -> Tuple[list[RankedCandidate], QueryRequirements]:
+    """
+    Función de alto nivel pensada para ser llamada desde app.py.
+
+    Devuelve:
+      - lista de RankedCandidate ya ordenados y filtrados
+      - el mismo QueryRequirements para logging/debug
+    """
+    orchestrator = _get_orchestrator()
+    internal_req = query_req.to_ranking_requirements()
+
+    ranked = orchestrator.run_ranking(
+        internal_req,
+        num_candidates=query_req.num_candidates,
+    )
+    return ranked, query_req
+
+
+# --------------------------------------------------------------------------------------
+# MODELO CLÁSICO (EXPERIMENTAL, NO USADO EN PRODUCCIÓN)
+# --------------------------------------------------------------------------------------
+
+
+@dataclass
+class CandidateFeatures:
+    role_match: float
+    skills_match: float
+    location_match: float
+    experience_score: float
+    language_score: float
+    candidate_id: str
+
+
+def _to_norm_set(items: List[str]) -> set:
+    return {_normalize_text(x) for x in items if _normalize_text(x)}
 
 
 def build_candidate_features(
-	query: QueryRequirements,
-	candidate: Dict[str, str],
-) -> Dict[str, float]:
-	"""Construye un conjunto de *features* numéricas consulta–candidato.
+    candidate: RankedCandidate,
+    req: QueryRequirements,
+) -> CandidateFeatures:
+    # Rol
+    role_match = 0.0
+    if req.role:
+        r_q = _normalize_text(req.role)
+        r_c = _normalize_text(candidate.role)
+        if r_q and r_q in r_c:
+            role_match = 1.0
 
-	Todas las salidas son escala 0–1 o valores numéricos sencillos para
-	un primer modelo interpretable de ranking.
-	"""
+    # Skills
+    skills_match = 0.0
+    if req.skills:
+        cand_skills = _to_norm_set(candidate.skills)
+        req_terms = _to_norm_set(req.skills)
+        if cand_skills and req_terms:
+            inter = cand_skills & req_terms
+            skills_match = len(inter) / len(req_terms)
 
-	q = asdict(query)
-	q_role = (q.get("role") or "").lower()
-	q_skills: List[str] = [s.lower() for s in q.get("skills") or []]
-	q_location = (q.get("location") or "").lower()
-	q_years = q.get("years_experience")
-	q_langs: List[str] = [l.lower() for l in q.get("languages") or []]
+    # Location
+    location_match = 0.0
+    if req.location:
+        if _normalize_text(candidate.location) == _normalize_text(req.location):
+            location_match = 1.0
 
-	c_role = (candidate.get("role") or "").lower()
-	c_skills = [s.lower() for s in _split_semicolon_list(candidate.get("skills", ""))]
-	c_location = (candidate.get("location") or "").lower()
-	try:
-		c_years = int(candidate.get("years_experience") or 0)
-	except ValueError:
-		c_years = 0
-	c_langs = [l.lower() for l in _split_semicolon_list(candidate.get("languages", ""))]
+    # Experiencia
+    experience_score = 0.0
+    if req.years_exp is not None:
+        diff = candidate.years_experience - req.years_exp
+        experience_score = 1.0 if diff >= 0 else 0.0
 
-	# 1) Coincidencia de rol (0–1)
-	role_match = 0.0
-	if q_role and c_role:
-		if q_role == c_role:
-			role_match = 1.0
-		elif q_role in c_role or c_role in q_role:
-			role_match = 0.7
+    # Idiomas
+    language_score = 0.0
+    if req.languages:
+        cand_lang = _to_norm_set(candidate.languages)
+        req_lang = _to_norm_set(req.languages)
+        if cand_lang and req_lang:
+            inter = cand_lang & req_lang
+            language_score = len(inter) / len(req_lang)
 
-	# 2) Skills: proporción de skills requeridas presentes en el candidato
-	if q_skills:
-		common_skills = set(q_skills).intersection(c_skills)
-		skills_match = len(common_skills) / len(set(q_skills))
-	else:
-		skills_match = 0.0
-
-	# 3) Ubicación: 1 si misma ciudad, 0.5 si ciudad vacía en query,
-	# 0 en otro caso.
-	if q_location and c_location:
-		location_match = 1.0 if q_location == c_location else 0.0
-	elif not q_location:
-		location_match = 0.5
-	else:
-		location_match = 0.0
-
-	# 4) Experiencia: 1 si cumple o supera; lineal decreciente si se
-	# queda corto, 0 si no se especifica.
-	raw_years_gap = 0.0
-	if q_years is not None:
-		if c_years >= q_years:
-			experience_score = 1.0
-			# diferencia absoluta de años por encima del mínimo requerido
-			raw_years_gap = float(c_years - q_years)
-		else:
-			gap = q_years - c_years
-			# penalización simple: pierde 0.2 por año de gap, mínimo 0
-			experience_score = max(0.0, 1.0 - 0.2 * gap)
-	else:
-		experience_score = 0.5
-
-	# 5) Idiomas: 1 si todos los idiomas requeridos están presentes.
-	if q_langs:
-		lang_ok = all(lang in c_langs for lang in q_langs)
-		language_score = 1.0 if lang_ok else 0.0
-	else:
-		language_score = 0.5
-
-	return {
-		"role_match": role_match,
-		"skills_match": skills_match,
-		"location_match": location_match,
-		"experience_score": experience_score,
-		"language_score": language_score,
-		"raw_years_gap": raw_years_gap,
-	}
+    return CandidateFeatures(
+        role_match=role_match,
+        skills_match=skills_match,
+        location_match=location_match,
+        experience_score=experience_score,
+        language_score=language_score,
+        candidate_id=candidate.id,
+    )
 
 
-__all__ = ["build_candidate_features"]
+def score_candidate(features: CandidateFeatures) -> float:
+    w_role = 0.3
+    w_skills = 0.3
+    w_location = 0.2
+    w_experience = 0.1
+    w_language = 0.1
+
+    s = (
+        w_role * features.role_match
+        + w_skills * features.skills_match
+        + w_location * features.location_match
+        + w_experience * features.experience_score
+        + w_language * features.language_score
+    )
+    return float(s)
 

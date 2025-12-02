@@ -1,4 +1,4 @@
-spacy==3.7.4
+spacy==3.7.0
 es-core-news-md @ https://github.com/explosion/spacy-models/releases/download/es_core_news_md-3.7.0/es_core_news_md-3.7.0-py3-none-any.whl
 
 transformers==4.45.2
@@ -10,7 +10,9 @@ numpy==1.26.4
 regex==2024.5.15
 
 pytest==8.3.3
-fastapi==0.115.0
+fastapi==0.103.2
 uvicorn[standard]==0.30.6
 
 beautifulsoup4==4.12.3
+
+sentence-transformers==3.2.1

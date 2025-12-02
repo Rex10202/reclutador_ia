@@ -1,37 +1,48 @@
-from typing import Dict
+from __future__ import annotations
+
+from typing import List, Tuple
+
+from .ranking_engine import RankingQueryRequirements, RankedCandidate
+from .ranking_features import build_candidate_features, CandidateFeatures
 
 
-def score_candidate(features: Dict[str, float]) -> float:
-	"""Combina features en un único puntaje de idoneidad.
+def score_candidate(features: CandidateFeatures) -> float:
+    """
+    Score lineal simple sobre las features.
+    Este modelo es sólo experimental y no se usa en producción,
+    dado que preferimos el modelo semántico de embeddings.
+    """
+    w_role = 0.3
+    w_skills = 0.3
+    w_location = 0.2
+    w_experience = 0.1
+    w_language = 0.1
 
-	Primero usa una combinación lineal de las features principales y
-	luego añade un pequeño término de desempate basado en experiencia.
-	"""
-
-	role_w = 0.25
-	skills_w = 0.35
-	exp_w = 0.25
-	loc_w = 0.1
-	lang_w = 0.05
-
-	base = (
-		role_w * features.get("role_match", 0.0)
-		+ skills_w * features.get("skills_match", 0.0)
-		+ exp_w * features.get("experience_score", 0.0)
-		+ loc_w * features.get("location_match", 0.0)
-		+ lang_w * features.get("language_score", 0.0)
-	)
-
-	# Término de desempate: si dos candidatos empatan en todo lo
-	# anterior pero uno tiene mayor experiencia relativa, se le da
-	# una ligera ventaja. Se espera que ``raw_years_gap`` sea la
-	# diferencia (c_years - q_years) calculada en otro lugar; si no
-	# está presente, se asume 0.
-	raw_years_gap = features.get("raw_years_gap", 0.0)
-	bonus = 0.001 * raw_years_gap
-
-	return base + bonus
+    s = (
+        w_role * features.role_match
+        + w_skills * features.skills_match
+        + w_location * features.location_match
+        + w_experience * features.experience_score
+        + w_language * features.language_score
+    )
+    return float(s)
 
 
-__all__ = ["score_candidate"]
+def rerank_with_classic_model(
+    candidates: List[RankedCandidate],
+    req: RankingQueryRequirements,
+) -> List[Tuple[RankedCandidate, float]]:
+    """
+    Opcional: dado un ranking semántico, reordena o inspecciona candidatos usando
+    el modelo clásico de features. Devuelve (candidato, score_clásico).
+    """
+    results: List[Tuple[RankedCandidate, float]] = []
+    for c in candidates:
+        feats = build_candidate_features(c, req)
+        s = score_candidate(feats)
+        results.append((c, s))
+
+    # Ordena de mayor a menor score clásico
+    results.sort(key=lambda t: -t[1])
+    return results
 

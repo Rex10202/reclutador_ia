@@ -7,10 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
+from query_pipeline import run_query_pipeline, NotAJobQuery, NoCandidatesFound
 
-from NLP.src.parser import parse_query
-from ranking_model.src.ranking_features import QueryRequirements as RankingQueryRequirements
-from ranking_model.src.ranking_orchestrator import run_ranking
 
 BASE_DIR = Path(__file__).resolve().parent
 FRONTEND_DIR = BASE_DIR / "frontend"
@@ -32,6 +30,8 @@ app.mount(
     name="static",
 )
 
+
+# ---------- Esquemas API ----------
 
 class QueryRequest(BaseModel):
     text: str
@@ -61,72 +61,45 @@ class FullResponse(BaseModel):
     candidates: List[CandidateResponse]
 
 
+# ---------- Endpoint principal ----------
+
 @app.post("/query", response_model=FullResponse)
 def handle_query(payload: QueryRequest):
     text = (payload.text or "").strip()
     if not text:
         raise HTTPException(status_code=400, detail="El texto de la consulta no puede estar vacío.")
 
-    # LOG: lo que llega a NLP
-    print("\n=== NLP INPUT ===")
-    print("raw_text:", repr(text))
+    try:
+        ranked_candidates, used_query = run_query_pipeline(text)
+    except NotAJobQuery as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except NoCandidatesFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
-    # 1) NLP: parsear la consulta en un objeto de dominio
-    nlp_q = parse_query(text)
-
-    # LOG: lo que sale de NLP
-    print("=== NLP OUTPUT (QueryRequirements) ===")
-    print("role:", nlp_q.role)
-    print("skills:", nlp_q.skills)
-    print("location:", nlp_q.location)
-    print("years_experience:", nlp_q.years_experience)
-    print("num_candidates:", nlp_q.num_candidates)
-    print("languages:", nlp_q.languages)
-
-    # 2) Mapear a esquema de ranking
-    ranking_q = RankingQueryRequirements(
-        role=nlp_q.role,
-        skills=nlp_q.skills,
-        location=nlp_q.location,
-        years_experience=nlp_q.years_experience,
-        num_candidates=nlp_q.num_candidates,
-        languages=nlp_q.languages,
-    )
-
-    # LOG: lo que se envía al modelo de ranking
-    print("=== RANKING INPUT (RankingQueryRequirements) ===")
-    print(ranking_q)
-
-    # 3) Ejecutar ranking
-    ranked = run_ranking(ranking_q)
-
-    # LOG: lo que devuelve el modelo de ranking
-    print("=== RANKING OUTPUT (top candidates) ===")
-    print(f"count: {len(ranked)}")
-    for item in ranked:
-        print(item["id"], item["role"], "score:", item["score"])
-
-    # 4) Construir respuesta
+    # used_query es RankingQuery (el de ranking_model/src/ranking_features.py)
     parsed_resp = ParsedQueryResponse(
-        role=nlp_q.role,
-        skills=nlp_q.skills,
-        location=nlp_q.location,
-        years_experience=nlp_q.years_experience,
-        num_candidates=nlp_q.num_candidates,
-        languages=nlp_q.languages,
+        role=used_query.role,
+        skills=used_query.skills or [],
+        location=used_query.location,
+        years_experience=used_query.years_exp,
+        num_candidates=used_query.num_candidates,
+        languages=used_query.languages or [],
     )
+
+    def _join(items: List[str]) -> str:
+        return ";".join(items) if items else ""
 
     candidate_items = [
         CandidateResponse(
-            id=item["id"],
-            role=item["role"],
-            skills=item["skills"],
-            location=item["location"],
-            years_experience=int(item["years_experience"]),
-            languages=item["languages"],
-            score=float(item["score"]),
+            id=c.id,
+            role=c.role,
+            skills=_join(c.skills),
+            location=c.location,
+            years_experience=int(c.years_experience),
+            languages=_join(c.languages),
+            score=float(c.score),
         )
-        for item in ranked
+        for c in ranked_candidates
     ]
 
     return FullResponse(parsed_query=parsed_resp, candidates=candidate_items)
@@ -142,7 +115,6 @@ def serve_index():
 
 
 if __name__ == "__main__":
-
     uvicorn.run(
         "app:app",
         host="127.0.0.1",
