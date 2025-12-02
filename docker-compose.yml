@@ -1,0 +1,14 @@
+services:
+  reclutador-ia:
+    build: .
+    container_name: reclutador_ia_container
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+      # Evitar que el entorno virtual local o pycache interfieran
+      - /app/env
+      - /app/__pycache__
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped

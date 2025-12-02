@@ -21,7 +21,12 @@ pytest==8.3.3
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 
 rapidfuzz==3.9.6
 >>>>>>> ade873c (Flexibilidad agente)
+=======
+
+beautifulsoup4==4.12.3
+>>>>>>> e3360ea46727ff87d2eb981b3f5b3a7d5e6394a7
