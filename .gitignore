@@ -1,5 +1,23 @@
+# Python
 .venv/
 venv/
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# Node.js / Next.js
+node_modules/
+.next/
+.turbo/
+out/
+build/
+
+# Local environment variables
+.env*.local
+
+# IDE / Editor
+.vscode/
+.idea/
+
+# OS-specific
+.DS_Store
