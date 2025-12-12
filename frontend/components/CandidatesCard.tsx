@@ -1,5 +1,5 @@
 // components/CandidatesCard.tsx
-import { MapPin, Clock, Globe, Briefcase, Sparkles } from 'lucide-react';
+import { MapPin, Clock, Globe, Briefcase, User } from 'lucide-react';
 import { Candidate } from '@/lib/types';
 
 interface CandidatesCardProps {
@@ -9,61 +9,96 @@ interface CandidatesCardProps {
 
 export function CandidatesCard({ candidate, onClick }: CandidatesCardProps) {
   const skillsArray = candidate.skills?.split(';').filter(s => s.trim()) || [];
+  const displayName = candidate.name || candidate.id;
+  const compatibilityPercent = Math.round(candidate.score * 100);
   
   return (
     <div 
       onClick={onClick}
-      className="group relative bg-gradient-to-br from-slate-800/40 to-slate-900/40 backdrop-blur-sm rounded-2xl p-6 border border-cyan-500/20 hover:border-cyan-400/40 transition-all duration-300 cursor-pointer hover:translate-x-2 hover:shadow-xl hover:shadow-cyan-500/10"
+      className="group bg-white border border-gray-200 rounded-xl p-5 hover:border-blue-300 hover:shadow-lg transition-all duration-200 cursor-pointer"
     >
-      {/* Glow effect on hover */}
-      <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/0 via-cyan-500/5 to-cyan-500/0 opacity-0 group-hover:opacity-100 rounded-2xl transition-opacity duration-300" />
-      
-      <div className="relative z-10">
-        <div className="flex justify-between items-start mb-4">
-          <div>
-            <h3 className="text-xl font-semibold text-white group-hover:text-cyan-400 transition-colors">
-              {candidate.id}
-            </h3>
-            <p className="text-slate-400 text-sm mt-1">{candidate.role}</p>
-          </div>
-          <div className="flex items-center gap-2 px-3 py-1 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 rounded-full border border-cyan-400/30">
-            <Sparkles className="w-4 h-4 text-cyan-400" />
-            <span className="text-cyan-400 font-bold text-sm">{candidate.score.toFixed(3)}</span>
-          </div>
+      <div className="flex items-start gap-4">
+        {/* Avatar */}
+        <div className="flex-shrink-0 w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+          <User className="w-6 h-6 text-blue-600" />
         </div>
         
-        <div className="flex flex-wrap gap-3 mb-3 text-sm text-slate-300">
-          <div className="flex items-center gap-1.5">
-            <MapPin className="w-4 h-4 text-cyan-400" />
-            <span>{candidate.location}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Clock className="w-4 h-4 text-cyan-400" />
-            <span>{candidate.years_experience}+ años</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Globe className="w-4 h-4 text-cyan-400" />
-            <span>{candidate.languages || '-'}</span>
-          </div>
-        </div>
-        
-        {skillsArray.length > 0 && (
-          <div className="flex items-start gap-2">
-            <Briefcase className="w-4 h-4 text-cyan-400 mt-1 flex-shrink-0" />
-            <div className="flex flex-wrap gap-1.5">
-              {skillsArray.slice(0, 3).map((skill: string, idx: number) => (
-                <span key={idx} className="px-2 py-1 bg-cyan-500/10 text-cyan-300 text-xs rounded-md border border-cyan-500/20">
-                  {skill.trim()}
-                </span>
-              ))}
-              {skillsArray.length > 3 && (
-                <span className="px-2 py-1 text-slate-400 text-xs">
-                  +{skillsArray.length - 3} más
-                </span>
-              )}
+        {/* Info Principal */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
+                {displayName}
+              </h3>
+              <p className="text-sm text-gray-500">
+                ID: {candidate.id}
+              </p>
+              <p className="text-sm font-medium text-gray-700 mt-1">
+                {candidate.role}
+              </p>
+            </div>
+            
+            {/* Barra de Compatibilidad */}
+            <div className="flex-shrink-0 w-36">
+              <p className="text-xs text-gray-500 mb-1 text-right">Compatibilidad</p>
+              <div className="w-full bg-gray-100 rounded-full h-2.5">
+                <div
+                  className={`h-2.5 rounded-full transition-all duration-500 ${
+                    compatibilityPercent >= 70 
+                      ? 'bg-green-500' 
+                      : compatibilityPercent >= 40 
+                        ? 'bg-blue-500' 
+                        : 'bg-amber-500'
+                  }`}
+                  style={{ width: `${compatibilityPercent}%` }}
+                />
+              </div>
+              <p className="text-xs text-gray-600 mt-1 text-right font-medium">
+                {compatibilityPercent}%
+              </p>
             </div>
           </div>
-        )}
+          
+          {/* Detalles */}
+          <div className="flex flex-wrap gap-4 mt-3 text-sm text-gray-600">
+            <div className="flex items-center gap-1.5">
+              <MapPin className="w-4 h-4 text-gray-400" />
+              <span>{candidate.location}</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Clock className="w-4 h-4 text-gray-400" />
+              <span>{candidate.years_experience}+ años de experiencia</span>
+            </div>
+            {candidate.languages && (
+              <div className="flex items-center gap-1.5">
+                <Globe className="w-4 h-4 text-gray-400" />
+                <span>{candidate.languages}</span>
+              </div>
+            )}
+          </div>
+          
+          {/* Skills */}
+          {skillsArray.length > 0 && (
+            <div className="flex items-start gap-2 mt-3">
+              <Briefcase className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+              <div className="flex flex-wrap gap-1.5">
+                {skillsArray.slice(0, 4).map((skill: string, idx: number) => (
+                  <span 
+                    key={idx} 
+                    className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-md border border-gray-200"
+                  >
+                    {skill.trim()}
+                  </span>
+                ))}
+                {skillsArray.length > 4 && (
+                  <span className="px-2 py-0.5 text-gray-400 text-xs">
+                    +{skillsArray.length - 4} más
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
