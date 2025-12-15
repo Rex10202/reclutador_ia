@@ -2,7 +2,6 @@
 import { 
   QueryRequest, 
   QueryResponse,
-  DocumentUploadResponse,
   AnalyzeDocumentsRequest,
   AnalyzeDocumentsResponse,
   UploadedDocument,
@@ -24,9 +23,9 @@ export const api = {
 
   /**
    * Sube múltiples documentos PDF para análisis
-   * @param files Array de archivos PDF (2-10 archivos)
+   * @param files Array de archivos PDF (1-10 archivos)
    */
-  async uploadDocuments(files: File[]): Promise<DocumentUploadResponse> {
+  async uploadDocuments(files: File[]): Promise<UploadedDocument[]> {
     const formData = new FormData();
     files.forEach((file) => {
       formData.append('files', file);
@@ -42,7 +41,19 @@ export const api = {
       throw new ApiError(response.status, error.detail || 'Error en la API');
     }
 
-    return response.json();
+    // El backend devuelve una lista de objetos CVAnalysisResponse
+    const data = await response.json();
+
+    // Mapeamos la respuesta del backend al tipo UploadedDocument del frontend
+    return data.map((doc: any) => ({
+      id: doc.document_id,
+      fileName: doc.filename,
+      fileSize: 0, // El backend no devuelve el tamaño, lo actualizaremos en el componente
+      uploadedAt: new Date(),
+      status: doc.status === 'success' ? 'ready' : 'error',
+      errorMessage: doc.error_message,
+      analysis: doc.extracted_attributes 
+    }));
   },
 
   /**
@@ -59,7 +70,8 @@ export const api = {
       filters,
     };
 
-    const response = await fetch(`${API_BASE_URL}/documents/analyze`, {
+    // CORRECCIÓN: Agregamos /api al path
+    const response = await fetch(`${API_BASE_URL}/api/documents/analyze`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -86,7 +98,17 @@ export const api = {
       throw new ApiError(response.status, error.detail || 'Error en la API');
     }
 
-    return response.json();
+    const doc = await response.json();
+    
+    return {
+      id: doc.document_id,
+      fileName: doc.filename,
+      fileSize: 0,
+      uploadedAt: new Date(),
+      status: doc.status === 'success' ? 'ready' : 'error',
+      errorMessage: doc.error_message,
+      analysis: doc.extracted_attributes
+    };
   },
 
   /**

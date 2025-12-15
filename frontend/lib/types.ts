@@ -10,6 +10,7 @@ export interface UploadedDocument {
   uploadedAt: Date;
   status: 'uploading' | 'processing' | 'ready' | 'error';
   errorMessage?: string;
+  analysis?: any; // Campo opcional para guardar el análisis inmediato si el backend lo devuelve
 }
 
 /** Atributos extraídos de un CV mediante OCR/NLP */
@@ -108,9 +109,10 @@ export interface DocumentUploadRequest {
   files: File[];
 }
 
-export interface DocumentUploadResponse {
-  documents: UploadedDocument[];
-}
+// Eliminamos DocumentUploadResponse porque ahora es un array directo de UploadedDocument
+// export interface DocumentUploadResponse {
+//   documents: UploadedDocument[];
+// }
 
 export interface AnalyzeDocumentsRequest {
   documentIds: string[];

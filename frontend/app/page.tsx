@@ -72,19 +72,32 @@ export default function TalentSearch() {
     setDocuments(prev => [...prev, ...newDocs]);
 
     try {
-      const response = await api.uploadDocuments(files);
+      // Ahora uploadDocuments devuelve directamente UploadedDocument[]
+      const uploadedDocs = await api.uploadDocuments(files);
       
-      // Actualizar con los IDs reales del servidor
       setDocuments(prev => {
-        const withoutTemp = prev.filter(d => !d.id.startsWith('temp-'));
-        return [...withoutTemp, ...response.documents];
+        // Mantenemos los documentos que NO son los temporales que acabamos de subir
+        const existingDocs = prev.filter(d => !newDocs.some(nd => nd.id === d.id));
+        
+        // Combinamos la respuesta del servidor con los datos locales (como fileSize)
+        const mergedDocs = uploadedDocs.map(serverDoc => {
+          // Buscamos el archivo original por nombre para recuperar su tamaño
+          const originalFile = files.find(f => f.name === serverDoc.fileName);
+          return {
+            ...serverDoc,
+            fileSize: originalFile ? originalFile.size : serverDoc.fileSize,
+          };
+        });
+
+        return [...existingDocs, ...mergedDocs];
       });
-    } catch (err) {
-      // Marcar documentos como error
+    } catch (err: any) {
+      console.error("Error upload:", err);
+      // Marcar documentos temporales como error
       setDocuments(prev => 
         prev.map(d => 
-          d.id.startsWith('temp-') 
-            ? { ...d, status: 'error' as const, errorMessage: 'Error al subir' }
+          newDocs.some(nd => nd.id === d.id)
+            ? { ...d, status: 'error' as const, errorMessage: err.message || 'Error al subir' }
             : d
         )
       );
