@@ -37,6 +37,7 @@ class CVAnalysisResponse(BaseModel):
     status: str  # "success", "error"
     extracted_attributes: List[ExtractedAttribute] = []
     raw_text_preview: Optional[str] = None
+    warnings: List[str] = []
     error_message: Optional[str] = None
     processing_time_ms: float
 
@@ -86,7 +87,7 @@ class ExtractedAttributesSimple(BaseModel):
     phone: Optional[str] = None
     location: Optional[str] = None
     role: str
-    yearsExperience: int
+    yearsExperience: Optional[int] = None
     skills: List[str]
     languages: List[str]
     education: List[str]
@@ -103,6 +104,7 @@ class ComparisonResult(BaseModel):
     missingSkills: List[str]
     highlights: List[str]
     concerns: List[str]
+    warnings: List[str] = []
 
 class SkillCount(BaseModel):
     skill: str

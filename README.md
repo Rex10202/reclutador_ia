@@ -1,21 +1,39 @@
 # Reclutador IA
 
-Sistema automatizado diseñado para optimizar procesos de selección mediante inteligencia artificial.
+App para subir hojas de vida, extraer atributos y comparar candidatos contra un perfil de puesto.
 
-## Descripción General
-El proyecto busca automatizar el análisis, filtrado y clasificación de perfiles laborales para facilitar la toma de decisiones en el área de recursos humanos.
+- Backend: FastAPI en `backend/`
+- Frontend: Next.js en `frontend/`
+- Extracción real: `packages/cv-extraction` (cargada por el backend)
 
-## Pilares del Proyecto
-- **Procesamiento de CVs:** Análisis automático de documentos.
-- **Evaluación Predictiva:** Clasificación de candidatos basada en requisitos.
-- **Interfaz Intuitiva:** Gestión simplificada de vacantes y postulantes.
+## Ejecutar (sin Docker)
 
-## Stack Tecnológico
-- **Lenguaje:** Python
-- **IA:** Modelos de procesamiento de lenguaje natural (NLP).
-- **Entorno:** Configuración simplificada para desarrollo rápido.
+### 1) Backend (Windows)
+```bash
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r backend/requirements.txt
+python -m spacy download es_core_news_md
+python backend/run.py
+```
 
-## Estado
-- [x] Estructura inicial del proyecto.
-- [ ] Implementación de lógica de filtrado.
-- [ ] Integración de interfaz de usuario.
+- API: http://127.0.0.1:8000
+- Docs: http://127.0.0.1:8000/docs
+
+Nota: en la primera ejecución, `transformers` puede descargar BETO (`dccuchile/bert-base-spanish-wwm-cased`).
+
+### 2) Frontend
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+- UI: http://localhost:3000
+
+## Endpoints principales
+
+- `POST /api/documents/upload`
+- `POST /api/documents/analyze`
+- `GET /api/documents/{id}`
+- `GET /api/documents/{id}/file`

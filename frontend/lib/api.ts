@@ -5,11 +5,34 @@ import {
   AnalyzeDocumentsRequest,
   AnalyzeDocumentsResponse,
   UploadedDocument,
+  CVAnalysisResponse,
   JobRequirements,
   InsightFilters
 } from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+
+function extractErrorMessage(payload: any, fallback: string): string {
+  if (!payload) return fallback;
+
+  if (typeof payload === 'string') return payload;
+
+  // FastAPI default
+  if (typeof payload.detail === 'string') return payload.detail;
+  // FastAPI detail may be an object/list
+  if (payload.detail && typeof payload.detail.message === 'string') return payload.detail.message;
+  if (payload.detail && typeof payload.detail.error === 'string') return payload.detail.error;
+
+  // Our ErrorResponse shape: { error: { message } }
+  if (payload.error && typeof payload.error.message === 'string') return payload.error.message;
+  if (typeof payload.message === 'string') return payload.message;
+
+  try {
+    return JSON.stringify(payload);
+  } catch {
+    return fallback;
+  }
+}
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -37,8 +60,8 @@ export const api = {
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Error al subir documentos' }));
-      throw new ApiError(response.status, error.detail || 'Error en la API');
+      const payload = await response.json().catch(() => null);
+      throw new ApiError(response.status, extractErrorMessage(payload, 'Error al subir documentos'));
     }
 
     // El backend devuelve una lista de objetos CVAnalysisResponse
@@ -80,8 +103,8 @@ export const api = {
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Error al analizar documentos' }));
-      throw new ApiError(response.status, error.detail || 'Error en la API');
+      const payload = await response.json().catch(() => null);
+      throw new ApiError(response.status, extractErrorMessage(payload, 'Error al analizar documentos'));
     }
 
     return response.json();
@@ -94,8 +117,8 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/api/documents/${documentId}`);
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Error al obtener estado' }));
-      throw new ApiError(response.status, error.detail || 'Error en la API');
+      const payload = await response.json().catch(() => null);
+      throw new ApiError(response.status, extractErrorMessage(payload, 'Error al obtener estado'));
     }
 
     const doc = await response.json();
@@ -112,6 +135,27 @@ export const api = {
   },
 
   /**
+   * Obtiene el análisis (atributos extraídos) de un documento
+   */
+  async getDocumentAnalysis(documentId: string): Promise<CVAnalysisResponse> {
+    const response = await fetch(`${API_BASE_URL}/api/documents/${documentId}`);
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      throw new ApiError(response.status, extractErrorMessage(payload, 'Error al obtener análisis del documento'));
+    }
+
+    return response.json();
+  },
+
+  /**
+   * URL para visualizar/descargar la hoja de vida original
+   */
+  getDocumentFileUrl(documentId: string): string {
+    return `${API_BASE_URL}/api/documents/${documentId}/file`;
+  },
+
+  /**
    * Elimina un documento subido
    */
   async deleteDocument(documentId: string): Promise<void> {
@@ -120,8 +164,8 @@ export const api = {
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Error al eliminar documento' }));
-      throw new ApiError(response.status, error.detail || 'Error en la API');
+      const payload = await response.json().catch(() => null);
+      throw new ApiError(response.status, extractErrorMessage(payload, 'Error al eliminar documento'));
     }
   },
 
@@ -140,8 +184,8 @@ export const api = {
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Error desconocido' }));
-      throw new ApiError(response.status, error.detail || 'Error en la API');
+      const payload = await response.json().catch(() => null);
+      throw new ApiError(response.status, extractErrorMessage(payload, 'Error desconocido'));
     }
 
     return response.json();

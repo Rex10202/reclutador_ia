@@ -20,7 +20,7 @@ export interface ExtractedAttributes {
   phone?: string;
   location?: string;
   role: string;
-  yearsExperience: number;
+  yearsExperience: number | null;
   skills: string[];
   languages: string[];
   education: string[];
@@ -68,6 +68,7 @@ export interface ComparisonResult {
   missingSkills: string[];
   highlights: string[];
   concerns: string[];
+  warnings?: string[];
 }
 
 /** Resumen estadístico del talento analizado */
@@ -87,10 +88,12 @@ export interface Candidate {
   role: string;
   score: number;
   location: string;
-  years_experience: number;
+  years_experience: number | null;
   languages: string;
   skills: string;
   matchBreakdown?: ComparisonResult['matchBreakdown'];
+  concerns?: string[];
+  highlights?: string[];
 }
 
 // ==================== MÓDULO 2: Búsqueda por Lenguaje Natural ====================
@@ -123,4 +126,24 @@ export interface AnalyzeDocumentsRequest {
 export interface AnalyzeDocumentsResponse {
   results: ComparisonResult[];
   summary: TalentSummary;
+}
+
+// ==================== Backend CV Analysis (raw extraction) ====================
+
+export interface CVExtractedAttribute {
+  attribute_type: string;
+  value: string;
+  confidence: number;
+  source_text?: string | null;
+}
+
+export interface CVAnalysisResponse {
+  document_id: string;
+  filename: string;
+  status: 'success' | 'error' | string;
+  extracted_attributes: CVExtractedAttribute[];
+  raw_text_preview?: string | null;
+  warnings?: string[];
+  error_message?: string | null;
+  processing_time_ms: number;
 }
