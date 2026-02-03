@@ -1,57 +1,52 @@
 # Backend API - COTECMAR Reclutador IA
 
-Arquitectura modular y escalable para análisis y matching de hojas de vida.
+API FastAPI para subir CVs, extraer atributos y comparar contra un perfil de puesto.
 
-## 📁 Estructura del Proyecto
+El extractor real vive en `packages/cv-extraction` y el backend lo carga automáticamente (vía `sys.path`).
+
+## 📁 Estructura (relevante)
 
 ```
 backend/
 ├── app/
-│   ├── __init__.py
-│   ├── main.py                    # FastAPI application factory
-│   ├── config.py                  # Configuration management
-│   ├── core/
-│   │   ├── exceptions.py          # Custom exceptions
-│   │   ├── logger.py              # Logging setup
-│   │   └── security.py            # File validation & security
+│   ├── main.py                    # Crea FastAPI + agrega rutas /api/*
 │   ├── api/
-│   │   └── v1/
-│   │       ├── documents/         # Module 1: CV Analysis
-│   │       │   └── router.py      # POST /api/v1/documents/upload
-│   │       └── search/            # Module 2: NL Search (fallback)
-│   │           └── router.py      # POST /api/v1/search
-│   ├── services/
-│   │   ├── pdf_processor.py       # PDF/DOCX text extraction
-│   │   ├── cv_extractor.py        # Attribute extraction (NLP integration)
-│   │   └── matching_engine.py     # Scoring & ranking
-│   ├── models/
-│   │   └── schemas.py             # Pydantic schemas (DTOs)
-│   └── utils/
-│       ├── file_handler.py        # File management utilities
-│       └── validators.py          # Input validation
+│   │   ├── __init__.py            # APIRouter(prefix="/api")
+│   │   ├── documents/router.py    # /api/documents/* (flujo principal)
+│   │   └── search/router.py       # /api/search/* (stub)
+│   ├── services/                  # wrappers hacia packages/cv-extraction
+│   └── models/schemas.py          # esquemas
 ├── requirements.txt
-├── .env
-└── run.py                         # Entry point
+└── run.py                         # entrypoint uvicorn
+
+packages/
+└── cv-extraction/cv_extraction/   # extracción real (PDFProcessor + CVExtractor)
 ```
 
-## 🚀 Instalación y Ejecución
+## 🚀 Instalación y ejecución (sin Docker)
 
-### 1. Crear virtualenv (si no existe)
+Recomendado: crear el virtualenv en la raíz del repo (para backend + packages).
+
+### 1) Crear y activar entorno (Windows)
 ```bash
-cd backend
-python -m venv venv
-venv\Scripts\activate  # Windows
-# o: source venv/bin/activate  # Linux/Mac
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 ```
 
-### 2. Instalar dependencias
+### 2) Instalar dependencias
 ```bash
-pip install -r requirements.txt
+pip install -r backend/requirements.txt
 ```
 
-### 3. Ejecutar servidor
+### 3) Instalar modelo de spaCy (recomendado)
+El extractor usa `es_core_news_md` para mejorar detección de rol/ubicación.
 ```bash
-python run.py
+python -m spacy download es_core_news_md
+```
+
+### 4) Ejecutar el backend
+```bash
+python backend/run.py
 ```
 
 El servidor estará disponible en:
@@ -59,16 +54,22 @@ El servidor estará disponible en:
 - **Swagger Docs**: http://127.0.0.1:8000/docs
 - **ReDoc**: http://127.0.0.1:8000/redoc
 
+Primera ejecución (NLP): `transformers` descargará el modelo BETO `dccuchile/bert-base-spanish-wwm-cased`.
+Esto puede tardar y requiere internet. Se cachea en la carpeta de Hugging Face del usuario.
+
+Windows: por defecto `UPLOAD_TEMP_DIR` es `/tmp/uploads` y normalmente termina como `C:\\tmp\\uploads`.
+Si prefieres que quede dentro del repo, define `UPLOAD_TEMP_DIR=./tmp/uploads` en `backend/.env`.
+
 ## 📚 API Endpoints
 
 ### Module 1: CV Analysis (Módulo Principal)
 
-#### `POST /api/v1/documents/upload`
+#### `POST /api/documents/upload`
 Subir y analizar múltiples CVs.
 
 **Request:**
 ```bash
-curl -X POST "http://127.0.0.1:8000/api/v1/documents/upload" \
+curl -X POST "http://127.0.0.1:8000/api/documents/upload" \
   -H "accept: application/json" \
   -F "files=@resume1.pdf" \
   -F "files=@resume2.pdf"
@@ -102,7 +103,7 @@ curl -X POST "http://127.0.0.1:8000/api/v1/documents/upload" \
 
 ---
 
-#### `GET /api/v1/documents/{document_id}`
+#### `GET /api/documents/{document_id}`
 Recuperar análisis previo de un documento.
 
 **Response:**
@@ -118,17 +119,20 @@ Recuperar análisis previo de un documento.
 
 ---
 
-#### `DELETE /api/v1/documents/{document_id}`
+#### `DELETE /api/documents/{document_id}`
 Eliminar un documento y su análisis.
 
 **Response:** `204 No Content`
 
 ---
 
-### Module 2: Natural Language Search (Fallback)
+#### `GET /api/documents/{document_id}/file`
+Devuelve el archivo original (PDF) para visualizarlo (iframe / nueva pestaña).
 
-#### `POST /api/v1/search`
-Búsqueda por lenguaje natural (cuando no se encuentren perfiles en CVs).
+### Search (placeholder)
+
+#### `POST /api/search`
+Actualmente es un stub (no usado por el frontend).
 
 **Request:**
 ```json
@@ -222,7 +226,7 @@ LOG_LEVEL=INFO
 
 ## 🏗️ Arquitectura de Capas
 
-### 1. **API Layer** (`api/v1/`)
+### 1. **API Layer** (`api/`)
 - Rutas HTTP
 - Validación de requests (Pydantic)
 - Manejo de errores

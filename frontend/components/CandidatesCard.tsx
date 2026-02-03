@@ -1,5 +1,5 @@
 // components/CandidatesCard.tsx
-import { MapPin, Clock, Globe, Briefcase, User } from 'lucide-react';
+import { MapPin, Clock, Globe, Briefcase, User, AlertTriangle } from 'lucide-react';
 import { Candidate } from '@/lib/types';
 
 interface CandidatesCardProps {
@@ -11,6 +11,8 @@ export function CandidatesCard({ candidate, onClick }: CandidatesCardProps) {
   const skillsArray = candidate.skills?.split(';').filter(s => s.trim()) || [];
   const displayName = candidate.name || candidate.id;
   const compatibilityPercent = Math.round(candidate.score * 100);
+  const hasConcerns = (candidate.concerns?.length || 0) > 0;
+  const concernsTooltip = hasConcerns ? (candidate.concerns || []).join('\n') : '';
   
   return (
     <div 
@@ -36,6 +38,15 @@ export function CandidatesCard({ candidate, onClick }: CandidatesCardProps) {
               <p className="text-sm font-medium text-gray-700 mt-1">
                 {candidate.role}
               </p>
+              {hasConcerns && (
+                <div
+                  className="mt-2 inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-amber-200 bg-amber-50 text-amber-800 text-xs"
+                  title={concernsTooltip}
+                >
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  Extracción incompleta
+                </div>
+              )}
             </div>
             
             {/* Barra de Compatibilidad */}
@@ -67,7 +78,11 @@ export function CandidatesCard({ candidate, onClick }: CandidatesCardProps) {
             </div>
             <div className="flex items-center gap-1.5">
               <Clock className="w-4 h-4 text-gray-400" />
-              <span>{candidate.years_experience}+ años de experiencia</span>
+              <span>
+                {candidate.years_experience === null
+                  ? 'Experiencia: No especificado'
+                  : `${candidate.years_experience}+ años de experiencia`}
+              </span>
             </div>
             {candidate.languages && (
               <div className="flex items-center gap-1.5">

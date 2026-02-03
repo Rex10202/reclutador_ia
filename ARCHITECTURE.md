@@ -1,368 +1,145 @@
-# 📐 Arquitectura del Proyecto
+# Arquitectura del Proyecto (estado actual)
 
-## Vista General
+Este documento describe **lo que está en uso y funcional** hoy en el repo (Feb 2026). También lista módulos presentes pero **no conectados** o **parcialmente implementados**.
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                                 USER (Reclutador)                           │
-└──────────────────────────────────┬──────────────────────────────────────────┘
-                                   │
-                ┌──────────────────┴──────────────────┐
-                │                                     │
-        ┌───────▼─────────┐              ┌───────────▼────────┐
-        │   FRONTEND      │              │     FRONTEND       │
-        │   (Next.js)     │              │   (Next.js)        │
-        │                 │              │                    │
-        │ MÓDULO 1:       │              │ MÓDULO 2:          │
-        │ CV Upload       │              │ NL Search          │
-        │ & Analysis      │              │ (Fallback)         │
-        │                 │              │                    │
-        │ Components:     │              │ Components:        │
-        │ - Uploader      │              │ - SearchBar        │
-        │ - Filters       │              │ - Results          │
-        │ - Comparison    │              │                    │
-        └───────┬─────────┘              └────────┬───────────┘
-                │                                 │
-                │         HTTP JSON              │
-                │    (http://localhost:3000)     │
-                │                                 │
-    ┌───────────▼─────────────────────────────────▼─────────────┐
-    │                  BACKEND (FastAPI)                        │
-    │          Modular Architecture with Clean Code             │
-    ├─────────────────────────────────────────────────────────┬─┤
-    │                     API Layer (v1)                      │ │
-    │  ┌──────────────────────────────────────────────────┐  │ │
-    │  │  /api/v1/documents (Module 1)                  │  │ │
-    │  │  ├─ POST /upload          → Upload CVs        │  │ │
-    │  │  ├─ GET /{id}             → Get analysis       │  │ │
-    │  │  └─ DELETE /{id}          → Delete doc         │  │ │
-    │  │                                                 │  │ │
-    │  │  /api/v1/search (Module 2)                     │  │ │
-    │  │  └─ POST /                → NL search          │  │ │
-    │  └──────────────────────────────────────────────────┘  │ │
-    ├─────────────────────────────────────────────────────────┤ │
-    │                  Service Layer                         │ │
-    │  ┌──────────────────────────────────────────────────┐  │ │
-    │  │  PDFProcessor                                   │  │ │
-    │  │  • extract_text() → TXT from PDF/DOCX          │  │ │
-    │  │                                                 │  │ │
-    │  │  CVExtractor                                    │  │ │
-    │  │  • extract_attributes() → Skills, Exp, etc     │  │ │
-    │  │  ⚠️ TODO: Integrate NLP/src/parser.py          │  │ │
-    │  │                                                 │  │
-    │  │  MatchingEngine                                 │  │ │
-    │  │  • compute_scores() → Ranking & matching        │  │ │
-    │  │  ⚠️ TODO: Integrate ranking_model/             │  │ │
-    │  └──────────────────────────────────────────────────┘  │ │
-    ├─────────────────────────────────────────────────────────┤ │
-    │                Core & Utilities                         │ │
-    │  ┌──────────────────────────────────────────────────┐  │ │
-    │  │  Exceptions     Logger     Security Validators  │  │ │
-    │  └──────────────────────────────────────────────────┘  │ │
-    └──────────────┬──────────────────────────────────────────┘ │
-                   │                                             │
-    ┌──────────────▼──────────────────────────────────────────┐ │
-    │           Models (Pydantic Schemas)                    │ │
-    │  • CVAnalysisResponse                                  │ │
-    │  • ExtractedAttribute                                  │ │
-    │  • ComparisonResponse                                  │ │
-    │  • SearchResponse                                      │ │
-    │  • ErrorResponse                                       │ │
-    └───────────────────────────────────────────────────────┬─┘
-                                                            │
-    ┌───────────────────────────────────────────────────────▼──┐
-    │         Integration Points (TODO)                       │
-    │  ┌────────────────────────────────────────────────────┐ │
-    │  │ NLP Module                                         │ │
-    │  │ • NLP/src/parser.py     → Role/Skill extraction  │ │
-    │  │ • NLP/src/schema.py     → Structured output      │ │
-    │  │ • NLP/config/ catalogs  → Lookup tables          │ │
-    │  └────────────────────────────────────────────────────┘ │
-    │  ┌────────────────────────────────────────────────────┐ │
-    │  │ Ranking Model                                      │ │
-    │  │ • ranking_model/ranking_engine.py  → Scoring     │ │
-    │  │ • ranking_model/ranking_features.py → Feature eng │ │
-    │  │ • ranking_model/config.py           → Settings    │ │
-    │  └────────────────────────────────────────────────────┘ │
-    └─────────────────────────────────────────────────────────┘
-```
+## Vista general
 
-## Estructura de Directorios Detallada
+### Qué se considera “funcional” en este repo
+
+- Subir CVs (PDF/DOCX/TXT) → extracción de texto → extracción de atributos → respuesta con `warnings`.
+- Analizar CVs contra requisitos del puesto → ranking simple + `concerns` (y también `warnings`).
+- Ver el archivo original subido (inline) y ver el “preview” del texto extraído.
+
+## Estructura de directorios (en uso)
+
+Árbol resumido de lo que participa en el flujo principal:
 
 ```
 reclutador_ia/
-│
-├── frontend/                          # Next.js Frontend
-│   ├── app/
-│   │   ├── page.tsx                   # Página principal
-│   │   ├── layout.tsx                 # Layout
-│   │   └── globals.css                # Estilos
-│   ├── components/
-│   │   ├── DocumentUploader.tsx       # 📤 Carga de CVs
-│   │   ├── InsightFilters.tsx         # 🔘 Filtros de criterios
-│   │   ├── ComparisonMatrix.tsx       # 📊 Tabla comparativa
-│   │   ├── ProfilePanel.tsx           # 👤 Panel detalle
-│   │   └── SearchBar.tsx              # 🔍 Búsqueda NL
-│   ├── lib/
-│   │   ├── api.ts                     # 🔗 Cliente HTTP (actualizado)
-│   │   └── types.ts                   # 📝 TypeScript types
-│   └── package.json
-│
-├── backend/                           # FastAPI Backend
-│   ├── app/
-│   │   ├── __init__.py
-│   │   ├── main.py                    # 🚀 FastAPI app factory
-│   │   ├── config.py                  # ⚙️  Configuración centralizada
-│   │   │
-│   │   ├── core/                      # 🔧 Lógica transversal
-│   │   │   ├── exceptions.py          # 🚨 Excepciones personalizadas
-│   │   │   ├── logger.py              # 📋 Logging centralizado
-│   │   │   └── security.py            # 🔐 Validaciones
-│   │   │
-│   │   ├── api/
-│   │   │   └── v1/
-│   │   │       ├── documents/         # 📦 MÓDULO 1: CV Analysis
-│   │   │       │   ├── __init__.py
-│   │   │       │   └── router.py      # POST /api/v1/documents/upload
-│   │   │       │                      # GET /api/v1/documents/{id}
-│   │   │       │                      # DELETE /api/v1/documents/{id}
-│   │   │       │
-│   │   │       └── search/            # 🔎 MÓDULO 2: NL Search
-│   │   │           ├── __init__.py
-│   │   │           └── router.py      # POST /api/v1/search
-│   │   │
-│   │   ├── services/                  # 💼 Lógica de negocio
-│   │   │   ├── pdf_processor.py       # 📄 Extracción de texto
-│   │   │   ├── cv_extractor.py        # 🧠 Análisis NLP
-│   │   │   └── matching_engine.py     # ⚡ Scoring & ranking
-│   │   │
-│   │   ├── models/                    # 📦 DTOs Pydantic
-│   │   │   └── schemas.py
-│   │   │
-│   │   └── utils/                     # 🛠️  Utilidades
-│   │       ├── file_handler.py        # 📁 Gestión de archivos
-│   │       └── validators.py          # ✓ Validaciones
-│   │
-│   ├── requirements.txt                # 📚 Dependencias Python
-│   ├── .env                            # 🔐 Variables de entorno
-│   ├── run.py                          # 🏃 Entry point
-│   └── README.md                       # 📖 Documentación API
-│
-├── NLP/                               # Módulo NLP (existente)
-│   ├── src/
-│   │   ├── parser.py                  # ⚠️ A integrar con CVExtractor
-│   │   ├── schema.py
-│   │   ├── extract_rules.py
-│   │   └── ...
-│   └── config/
-│       ├── roles.json
-│       ├── skills.json
-│       ├── cities_co.json
-│       └── languages.json
-│
-├── ranking_model/                     # Modelo ranking (existente)
-│   ├── src/
-│   │   ├── ranking_engine.py          # ⚠️ A integrar
-│   │   ├── ranking_features.py
-│   │   ├── ranking_orchestrator.py
-│   │   └── ...
-│   └── data/
-│
-└── INTEGRATION_GUIDE.md               # 📖 Guía de integración
+  backend/
+    run.py
+    requirements.txt
+    app/
+      main.py
+      config.py
+      api/
+        __init__.py
+        documents/
+          router.py
+          __init__.py
+        search/
+          router.py            # existe, pero no está implementado (501)
+          __init__.py
+      core/
+        security.py
+        logger.py
+        exceptions.py
+        __init__.py
+      models/
+        schemas.py
+        __init__.py
+      services/                # wrappers que delegan a packages/
+        cv_extractor.py
+        pdf_processor.py
+        document_normalizer.py
+        section_detector.py
+        matching_engine.py
+        __init__.py
+      utils/
+        file_handler.py
+        validators.py
+        __init__.py
+
+  frontend/
+    package.json
+    app/
+      layout.tsx
+      page.tsx
+      globals.css
+    components/
+      DocumentUploader.tsx
+      JobDescriptionInput.tsx
+      InsightFilters.tsx
+      TalentSummary.tsx
+      CandidatesCard.tsx
+      ProfilePanel.tsx
+      SearchBar.tsx            # existe, pero no está conectado en page.tsx
+    lib/
+      api.ts
+      types.ts
+    public/
+      CotecmarLogo.png
+
+  packages/
+    cv-extraction/
+      cv_extraction/
+        cv_extractor.py
+        pdf_processor.py
+        section_detector.py
+        document_normalizer.py
+        exceptions.py
+        logging_utils.py
+        __init__.py
+    NLP/                       # opcional (no requerido para el flujo básico)
+      config/
+      src/
+      data/
+      tests/
+      __init__.py
+    ranking/                   # presente; no es parte del flujo principal actual
+      src/
+      data/
+      tests/
 ```
 
-## Flujos de Datos
+## Flujos HTTP (contrato real)
 
-### 📊 MÓDULO 1: Análisis de CVs (Flujo Completo)
+### 1) Upload + extracción base
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  1. USER ACTION: Reclutadora sube 3 CVs en PDF                 │
-└────────────────────────┬────────────────────────────────────────┘
-                         │
-    ┌────────────────────▼────────────────────┐
-    │  Frontend: DocumentUploader.tsx          │
-    │  - Valida: 2-10 archivos                │
-    │  - Valida: formato PDF/DOCX/TXT         │
-    │  - Valida: < 50MB por archivo          │
-    └────────────────────┬────────────────────┘
-                         │
-         ┌───────────────▼──────────────────┐
-         │  POST /api/v1/documents/upload   │
-         │  Content-Type: multipart/form-data│
-         │  files: [file1.pdf, file2.pdf...]│
-         └───────────────┬──────────────────┘
-                         │
-    ┌────────────────────▼────────────────────┐
-    │  Backend: documents/router.py            │
-    │  - Valida archivos nuevamente           │
-    │  - Genera document_id único             │
-    │  - Guarda archivos temporalmente        │
-    └────────────────────┬────────────────────┘
-                         │
-    ┌────────────────────▼────────────────────┐
-    │  PDFProcessor.extract_text()             │
-    │  - Lee PDF/DOCX/TXT                     │
-    │  - Extrae texto plano                   │
-    │  - Retorna: full_text (ej: 1500 chars)  │
-    └────────────────────┬────────────────────┘
-                         │
-    ┌────────────────────▼────────────────────┐
-    │  CVExtractor.extract_attributes()        │
-    │  - Analiza roles (BETO embeddings)      │ ⚠️ TODO
-    │  - Extrae skills (NLP catalog matching) │
-    │  - Calcula experiencia (regex + NLP)    │
-    │  - Detecta ubicación (city catalog)     │
-    │  - Detecta idiomas (language catalog)   │
-    │                                          │
-    │  Retorna: [ExtractedAttribute{...}, ...] │
-    └────────────────────┬────────────────────┘
-                         │
-    ┌────────────────────▼────────────────────┐
-    │  MatchingEngine.compute_scores()         │
-    │  - Compara atributos con job_required   │
-    │  - Aplica insight_filters weights       │
-    │  - Calcula overall_score (0-100)        │ ⚠️ TODO
-    │                                          │
-    │  Retorna: CVMatchingResult{...}          │
-    └────────────────────┬────────────────────┘
-                         │
-    ┌────────────────────▼────────────────────┐
-    │  Response: List[CVAnalysisResponse]      │
-    │  [{                                      │
-    │    "document_id": "uuid-1",              │
-    │    "filename": "juan_cv.pdf",            │
-    │    "status": "success",                  │
-    │    "extracted_attributes": [             │
-    │      {                                   │
-    │        "attribute_type": "role",         │
-    │        "value": "Senior Developer",      │
-    │        "confidence": 0.98                │
-    │      },                                  │
-    │      ...                                 │
-    │    ],                                    │
-    │    "processing_time_ms": 245.3           │
-    │  }, ...]                                 │
-    └────────────────────┬────────────────────┘
-                         │
-    ┌────────────────────▼────────────────────┐
-    │  Frontend: ComparisonMatrix.tsx          │
-    │  - Renderiza tabla con resultados       │
-    │  - Muestra scores por criterio          │
-    │  - Ordena por overall_score             │
-    │  - Permite ver detalles en panel        │
-    └────────────────────────────────────────┘
-```
+- **Frontend**: [frontend/app/page.tsx](frontend/app/page.tsx) → `DocumentUploader`
+- **Backend**: [backend/app/api/documents/router.py](backend/app/api/documents/router.py)
 
-### 🔍 MÓDULO 2: Búsqueda por Lenguaje Natural (Fallback)
+Request:
+- `POST /api/documents/upload` (multipart)
 
-```
-┌──────────────────────────────────────────────────────┐
-│  USER ACTION: No encontró perfil en CVs, busca NL   │
-└────────────────────┬─────────────────────────────────┘
-                     │
-    ┌────────────────▼──────────────────┐
-    │  Frontend: SearchBar.tsx            │
-    │  - User escribe: "Ingeniero Python │
-    │    con 5 años en Django, Bogotá"  │
-    └────────────────┬──────────────────┘
-                     │
-    ┌────────────────▼──────────────────┐
-    │  POST /api/v1/search               │
-    │  Content-Type: application/json    │
-    │  {                                 │
-    │    "text": "Ingeniero Python..."   │
-    │  }                                 │
-    └────────────────┬──────────────────┘
-                     │
-    ┌────────────────▼──────────────────┐
-    │  Backend: search/router.py          │
-    │  ⚠️ TODO: Integrar query_pipeline   │
-    │                                    │
-    │  - Valida que sea job query       │
-    │  - Parsea con NLP module          │
-    │  - Busca en DB de candidatos      │
-    │  - Ranking semántico              │
-    └────────────────┬──────────────────┘
-                     │
-    ┌────────────────▼──────────────────┐
-    │  Response: SearchResponse           │
-    │  {                                 │
-    │    "candidates": [{...}],          │
-    │    "parsed_query": {...},          │
-    │    "total_results": 15             │
-    │  }                                 │
-    └────────────────┬──────────────────┘
-                     │
-    ┌────────────────▼──────────────────┐
-    │  Frontend: SearchResults            │
-    │  - Renderiza lista de candidatos   │
-    │  - Muestra scores de compatibilidad│
-    │  - Permite click para detalles     │
-    └────────────────────────────────────┘
-```
+Response (por archivo):
+- `document_id`, `extracted_attributes[]`, `raw_text_preview`, `warnings[]`.
 
-## 🔌 Puntos de Integración Clave
+Notas de confiabilidad:
+- Si `role` o `location` vienen “detectados” pero **no se pueden verificar** dentro del texto del CV, se eliminan de `extracted_attributes` y se agrega `warnings`.
 
-```
-┌─────────────────────────────────────────────┐
-│  CVExtractor ←→ NLP/src/parser.py           │
-│  ─────────────────────────────────────────  │
-│  Current: Placeholder extractions           │
-│  Todo:    Use existing spaCy + BETO        │
-│           - parse_query() → role detection │
-│           - skill extraction from catalog  │
-│           - experience years regex         │
-│           - location + language detection │
-└─────────────────────────────────────────────┘
+### 2) Analyze (ranking vs perfil)
 
-┌─────────────────────────────────────────────┐
-│  MatchingEngine ←→ ranking_model/            │
-│  ─────────────────────────────────────────  │
-│  Current: Simple string matching            │
-│  Todo:    Use SemanticRankingEngine         │
-│           - Embeddings (sentence-transformers)
-│           - Cosine similarity scoring      │
-│           - Orchestrator filters          │
-│           - Fallback mechanisms           │
-└─────────────────────────────────────────────┘
+- **Frontend**: [frontend/app/page.tsx](frontend/app/page.tsx) (`handleAnalyze`)
+- **Backend**: [backend/app/api/documents/router.py](backend/app/api/documents/router.py)
 
-┌─────────────────────────────────────────────┐
-│  search/router.py ←→ query_pipeline.py      │
-│  ─────────────────────────────────────────  │
-│  Current: Stub implementation               │
-│  Todo:    Integrate existing query logic    │
-│           - job_query_filter validation    │
-│           - NLP parsing                    │
-│           - Ranking against DB             │
-└─────────────────────────────────────────────┘
-```
+Request:
+- `POST /api/documents/analyze` con `documentIds[]`, `jobRequirements`, `filters`.
 
-## ✅ Status de Implementación
+Response:
+- `results[]` con:
+  - `candidateName` (se intenta extraer del texto del CV, no del filename)
+  - `attributes` (rol/ubicación/skills/idiomas/experiencia)
+  - `overallScore`, `matchBreakdown`, `highlights`, `concerns`, `warnings`
 
-```
-┌──────────────────────────────┬─────────────┐
-│ Componente                   │ Status      │
-├──────────────────────────────┼─────────────┤
-│ Frontend (UI + Components)   │ ✅ Listo    │
-│ API Contracts (DTOs)         │ ✅ Listo    │
-│ Backend Structure            │ ✅ Listo    │
-│ File Upload & Validation     │ ✅ Listo    │
-│ Exception Handling           │ ✅ Listo    │
-│ Logging & Config             │ ✅ Listo    │
-│ CORS Setup                   │ ✅ Listo    │
-│ PDF Text Extraction          │ ⚠️ Básico   │
-│ NLP Attribute Extraction     │ ⚠️ TODO     │
-│ Semantic Ranking             │ ⚠️ TODO     │
-│ NL Search Integration        │ ⚠️ TODO     │
-│ Database Persistence         │ ⚠️ TODO     │
-│ Tests & CI/CD                │ ⚠️ TODO     │
-└──────────────────────────────┴─────────────┘
-```
+Notas de confiabilidad:
+- Si **no se detecta** experiencia, se envía `yearsExperience: null` (no “0”).
+- `concerns` y `warnings` explican campos faltantes / no verificables.
 
----
+### 3) Ver CV original
 
-Para detalles de implementación, ver:
-- `INTEGRATION_GUIDE.md` - Cómo ejecutar localmente
-- `backend/README.md` - Documentación API
-- `backend/app/models/schemas.py` - Estructura de datos
+- `GET /api/documents/{document_id}/file` devuelve el archivo original con `Content-Disposition: inline` para poder mostrarse en iframe/modal.
+
+## Presente pero NO conectado / NO implementado
+
+- **NL Search**:
+  - Backend: [backend/app/api/search/router.py](backend/app/api/search/router.py) responde `501` (pendiente integrar pipeline).
+  - Frontend: [frontend/components/SearchBar.tsx](frontend/components/SearchBar.tsx) existe, pero no se usa en la página principal.
+
+- **Ranking avanzado / embeddings**:
+  - `packages/ranking/` está presente, pero el scoring principal actual vive en el endpoint de analyze (lógica simple).
+
+## Puntos de extensión recomendados
+
+- Centralizar un “motor de scoring” real en `packages/ranking/` y hacerlo la única fuente del score.
+- Persistencia (DB) para documentos, resultados y estado de análisis (hoy se usa almacenamiento temporal por `document_id`).

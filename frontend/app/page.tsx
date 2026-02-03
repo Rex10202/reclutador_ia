@@ -2,9 +2,9 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import Image from 'next/image';
 import { CandidatesCard } from '@/components/CandidatesCard';
 import { ProfilePanel } from '@/components/ProfilePanel';
-import { SearchBar } from '@/components/SearchBar';
 import { DocumentUploader } from '@/components/DocumentUploader';
 import { JobDescriptionInput } from '@/components/JobDescriptionInput';
 import { InsightFilters } from '@/components/InsightFilters';
@@ -17,7 +17,7 @@ import {
   InsightFilters as InsightFiltersType,
   TalentSummary as TalentSummaryType 
 } from '@/lib/types';
-import { Anchor, Search, FileText, Sparkles } from 'lucide-react';
+import { Search, FileText, Sparkles } from 'lucide-react';
 
 // Estados iniciales
 const INITIAL_JOB_REQUIREMENTS: JobRequirements = {
@@ -51,12 +51,6 @@ export default function TalentSearch() {
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState('');
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
-
-  // ==================== MÓDULO 2: Búsqueda NL (Fallback) ====================
-  const [nlQuery, setNlQuery] = useState('');
-  const [nlSearching, setNlSearching] = useState(false);
-  const [nlError, setNlError] = useState('');
-  const [showNlFallback, setShowNlFallback] = useState(false);
 
   // Manejo de archivos subidos
   const handleFilesSelected = useCallback(async (files: File[]) => {
@@ -124,10 +118,12 @@ export default function TalentSearch() {
         role: result.attributes.role,
         score: result.overallScore / 100, // Normalizar a 0-1
         location: result.attributes.location || 'No especificado',
-        years_experience: result.attributes.yearsExperience,
+        years_experience: result.attributes.yearsExperience ?? null,
         languages: result.attributes.languages.join('; '),
         skills: result.attributes.skills.join('; '),
         matchBreakdown: result.matchBreakdown,
+        concerns: result.concerns,
+        highlights: result.highlights,
       }));
 
       setCandidates(candidatesFromResults);
@@ -140,28 +136,6 @@ export default function TalentSearch() {
       }
     } finally {
       setAnalyzing(false);
-    }
-  };
-
-  // Búsqueda por lenguaje natural (fallback)
-  const handleNlSearch = async () => {
-    if (!nlQuery.trim()) return;
-
-    setNlSearching(true);
-    setNlError('');
-
-    try {
-      const data = await api.searchCandidates(nlQuery);
-      setCandidates(data.candidates || []);
-      setShowNlFallback(false);
-    } catch (err) {
-      if (err instanceof ApiError) {
-        setNlError(err.message);
-      } else {
-        setNlError('Error al conectar con el servidor');
-      }
-    } finally {
-      setNlSearching(false);
     }
   };
 
@@ -190,8 +164,15 @@ export default function TalentSearch() {
         <header className="bg-white border-b border-gray-200 px-6 py-4">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-blue-900 rounded-lg flex items-center justify-center">
-                <Anchor className="w-7 h-7 text-white" />
+              <div className="w-12 h-12 rounded-lg bg-white border border-gray-200 relative overflow-hidden">
+                <Image
+                  src="/CotecmarLogo.png"
+                  alt="COTECMAR"
+                  fill
+                  sizes="48px"
+                  priority
+                  className="object-contain p-1"
+                />
               </div>
               <div>
                 <h1 className="text-xl font-bold text-blue-900">COTECMAR</h1>
@@ -310,12 +291,6 @@ export default function TalentSearch() {
                     <p className="text-gray-500 mb-4">
                       No se encontraron candidatos que coincidan con el perfil buscado.
                     </p>
-                    <button
-                      onClick={() => setShowNlFallback(true)}
-                      className="text-blue-600 hover:text-blue-700 font-medium"
-                    >
-                      ¿Intentar con búsqueda por lenguaje natural?
-                    </button>
                   </div>
                 )}
 
@@ -336,25 +311,6 @@ export default function TalentSearch() {
               </div>
             )}
 
-            {/* ========== MÓDULO 2: Fallback de Lenguaje Natural ========== */}
-            <div className="mt-12 pt-8 border-t border-gray-200">
-              <div className="text-center mb-6">
-                <p className="text-gray-500 text-sm">
-                  ¿No encuentras lo que buscas? Intenta con una búsqueda en lenguaje natural
-                </p>
-              </div>
-              <div className="max-w-2xl mx-auto">
-                <SearchBar
-                  value={nlQuery}
-                  onChange={setNlQuery}
-                  onSearch={handleNlSearch}
-                  loading={nlSearching}
-                />
-                {nlError && (
-                  <p className="text-red-500 text-sm text-center mt-2">{nlError}</p>
-                )}
-              </div>
-            </div>
           </div>
         </main>
       </div>
@@ -364,6 +320,7 @@ export default function TalentSearch() {
         <div className="fixed right-0 top-0 h-full z-50">
           <ProfilePanel 
             candidate={selectedCandidate} 
+            jobRequirements={jobRequirements}
             onClose={() => setSelectedCandidate(null)}
             onMarkInterested={handleMarkInterested}
             onAddToList={handleAddToList}

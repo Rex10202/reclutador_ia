@@ -1,5 +1,29 @@
 """Main FastAPI application factory."""
 
+# Ensure repository root is on sys.path so the backend can import sibling
+# modules like the top-level `NLP` package regardless of the working directory.
+import sys
+from pathlib import Path
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+_PACKAGES_DIR = _REPO_ROOT / "packages"
+if _PACKAGES_DIR.exists() and str(_PACKAGES_DIR) not in sys.path:
+    sys.path.insert(0, str(_PACKAGES_DIR))
+
+# cv-extraction uses a hyphenated folder name; add it explicitly so
+# `import cv_extraction` works.
+_CV_EXTRACTION_DIR = _PACKAGES_DIR / "cv-extraction"
+if _CV_EXTRACTION_DIR.exists() and str(_CV_EXTRACTION_DIR) not in sys.path:
+    sys.path.insert(0, str(_CV_EXTRACTION_DIR))
+
+# ranking package keeps importable modules under packages/ranking/src
+_RANKING_SRC_DIR = _PACKAGES_DIR / "ranking" / "src"
+if _RANKING_SRC_DIR.exists() and str(_RANKING_SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(_RANKING_SRC_DIR))
+
 from datetime import datetime
 from typing import Dict
 
